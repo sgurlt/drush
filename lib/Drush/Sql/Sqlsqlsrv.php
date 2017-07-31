@@ -10,7 +10,23 @@ class Sqlsqlsrv extends SqlBase {
   public function command() {
     return 'sqlcmd';
   }
+  
+  /**
+   * Override of params_to_options.
+   */
+  public function params_to_options($parameters) {
+    // Turn each parameter into a valid parameter string.
+    $parameter_strings = array();
+    foreach ($parameters as $key => $value) {
+      // Only escape the values, not the keys or the rest of the string.
+      $value = drush_escapeshellarg($value);
+      $parameter_strings[] = "-$key $value";
+    }
 
+    // Join the parameters and return.
+    return implode(' ', $parameter_strings);
+  }
+  
   public function creds() {
     // Some drush commands (e.g. site-install) want to connect to the
     // server, but not the database.  Connect to the built-in database.
@@ -21,7 +37,13 @@ class Sqlsqlsrv extends SqlBase {
       return ' -S ' . $host . ' -d ' . $database;
     }
     else {
-      return ' -S ' . $host . ' -d ' . $database . ' -U ' . $this->db_spec['username'] . ' -P ' . $this->db_spec['password'];
+      $parameters = array(
+        'S' => $host,
+        'd' => $database,
+        'U' => $this->db_spec['username'],
+        'P' => $this->db_spec['password']
+      );
+      return $this->params_to_options($parameters);
     }
   }
 
@@ -54,7 +76,13 @@ class Sqlsqlsrv extends SqlBase {
     if (!$file) {
       $file = $this->db_spec['database'] . '_' . date('Ymd_His') . '.bak';
     }
-    $exec = "sqlcmd -U \"" . $this->db_spec['username'] . "\" -P \"" . $this->db_spec['password'] . "\" -S \"" . $this->db_spec['host'] . "\" -Q \"BACKUP DATABASE [" . $this->db_spec['database'] . "] TO DISK='" . $file . "'\"";
+    $parameters = array(
+        'U' => $this->db_spec['username'],
+        'P' => $this->db_spec['password'],
+        'S' => $this->db_spec['host'],
+        'Q' => "BACKUP DATABASE [" . $this->db_spec['database'] . "] TO DISK='" . $file . "'\"",
+      );
+    $exec = "sqlcmd " . $this->params_to_options($parameters);
     if ($option = drush_get_option('extra', $this->query_extra)) {
       $exec .= " $option";
     }
